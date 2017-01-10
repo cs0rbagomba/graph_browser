@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.6)
 project (PROJECT_GRAPH_BROWSER)
 
-set (CXX_FLAGS "-std=c++14")
+set (CXX_FLAGS "-std=c++14 -ggdb")
 add_definitions(${CXX_FLAGS})
 
 set (CMAKE_CXX_COMPILER "/usr/bin/g++-5.1.0")
