@@ -94,33 +94,25 @@ public:
     , history_()
     , history_string_()
   {
-    /* Crate menu */
     menu_ = new_menu((ITEM **)items_);
 
-    /* Create the window to be associated with the menu */
     current_win_ = newwin(10, 40, 1, 0);
     keypad(current_win_, TRUE);
 
-    /* Set main window and sub window */
     set_menu_win(menu_, current_win_);
     set_menu_sub(menu_, derwin(current_win_, 6, 38, 3, 1));
     set_menu_format(menu_, 6, 1);
 
-    /* Set menu mark to the string " * " */
     set_menu_mark(menu_, " ");
 
-    /* Print a border around the main window and print a title */
     box(current_win_, 0, 0);
-    //wborder(current_win_, '|', '|', '-', '-', '+', '+', '+', '+');
 
-    printInTheMiddle(current_win_, 1, 0, 40, "Current");
     mvwaddch(current_win_, 2, 0, ACS_LTEE);
     mvwhline(current_win_, 2, 1, ACS_HLINE, 38);
     mvwaddch(current_win_, 2, 39, ACS_RTEE);
     mvprintw(TERM_MAX_Y-1, 0, "ESC to exit, cursor keys to navigate");
     refresh();
 
-    /* Post the menu */
     post_menu(menu_);
     wrefresh(current_win_);
   }
@@ -150,33 +142,12 @@ public:
 
           const std::string prev = history_.back();
           history_.pop_back();
-          current_ = prev;
-          const std::vector<std::string>& n = graph_.neighboursOf(prev);
-         printInTheMiddle(current_win_, 1, 0, 40-2, prev.c_str());
-          addItems(n);
-          history_string_ = historyToString();
-          mvprintw(0, 0, "%s", std::string(TERM_MAX_X,' ').c_str());
-          mvprintw(0, 0, history_string_.c_str());
-          refresh();
-          break;
+          update(prev);
         }
         case KEY_RIGHT: {
           std::string next = item_name(current_item(menu_));
-
-          const std::vector<std::string>& n = graph_.neighboursOf(next);
           history_.push_back(current_);
-          current_ = next;
-          printInTheMiddle(current_win_, 1, 0, 40-2, next.c_str());
-          addItems(n);
-
-          history_string_ = historyToString();
-          while (history_string_.length() > TERM_MAX_X) {
-            history_.pop_front();
-            history_string_ = historyToString();
-          }
-          mvprintw(0, 0, "%s",std::string(TERM_MAX_X,' ').c_str());
-          mvprintw(0, 0, history_string_.c_str());
-          refresh();
+          update(next);
           break;
         }
         case KEY_NPAGE:
@@ -195,11 +166,27 @@ public:
   {
     current_ = s;
     const std::vector<std::string>& n = graph_.neighboursOf(current_);
-    printInTheMiddle(current_win_, 1, 0, 40-2, current_.c_str());
+    printInTheMiddle(current_win_, current_.c_str());
     addItems(n);
   }
 
 private:
+
+  void update(const std::string& s) {
+    const std::vector<std::string>& n = graph_.neighboursOf(s);
+    current_ = s;
+    printInTheMiddle(current_win_, s.c_str());
+    addItems(n);
+
+    history_string_ = historyToString();
+    while (history_string_.length() > TERM_MAX_X) {
+      history_.pop_front();
+      history_string_ = historyToString();
+    }
+    mvprintw(0, 0, "%s",std::string(TERM_MAX_X,' ').c_str());
+    mvprintw(0, 0, history_string_.c_str());
+    refresh();
+  }
 
   void addItems(const std::vector<std::string>& stringVector)
   {
@@ -216,7 +203,6 @@ private:
     set_menu_items(menu_, items_);
     set_menu_format(menu_, 6, 1);
 
-    /* Post the menu */
     post_menu(menu_);
     wrefresh(current_win_);
   }
@@ -234,29 +220,13 @@ private:
     return s;
   }
 
-  void printInTheMiddle(WINDOW *win, int starty, int startx, int width, const std::string& s)
+  void printInTheMiddle(WINDOW *win, const std::string& s, int line = 1, int border = 1)
   {
-    size_t x, y;
-    float temp;
+    int max_y, max_x;
+    getmaxyx(win, max_y, max_x);
 
-    if(win == NULL)
-            win = stdscr;
-    getyx(win, y, x);
-    if(startx != 0)
-            x = startx;
-    if(starty != 0)
-            y = starty;
-    if(width == 0)
-            width = 80;
-
-    temp = (width - s.length())/ 2;
-    x = startx + (int)temp;
-
-    y = 1;
-    x = 1 + (int)temp;
-
-    mvwprintw(win, 1, 1, "%s",std::string(width-2,' ').c_str());
-    mvwprintw(win, y, x, "%s", s.c_str());
+    mvwprintw(win, line, border, "%s", std::string(max_x-border*2,' ').c_str());
+    mvwprintw(win, line, (max_x - s.length()) / 2, "%s", s.c_str());
     refresh();
   }
 
