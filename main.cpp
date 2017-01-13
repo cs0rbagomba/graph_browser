@@ -61,6 +61,8 @@ public:
   static constexpr size_t TERM_MAX_X = 80;
   static constexpr size_t TERM_MAX_Y = 24;
   static constexpr int KEY_ESC = 27;
+  static constexpr size_t current_window_width = TERM_MAX_X/4;
+  static constexpr size_t current_window_height = TERM_MAX_Y-2;
 
   void static init()
   {
@@ -96,20 +98,20 @@ public:
   {
     menu_ = new_menu((ITEM **)items_);
 
-    current_win_ = newwin(10, 40, 1, 0);
+    current_win_ = newwin(current_window_height, current_window_width, 1, 0);
     keypad(current_win_, TRUE);
 
     set_menu_win(menu_, current_win_);
-    set_menu_sub(menu_, derwin(current_win_, 6, 38, 3, 1));
-    set_menu_format(menu_, 6, 1);
+    set_menu_sub(menu_, derwin(current_win_, current_window_height-4, current_window_width-2, 3, 1));
+    set_menu_format(menu_, current_window_height-4, 1);
 
     set_menu_mark(menu_, " ");
 
     box(current_win_, 0, 0);
 
     mvwaddch(current_win_, 2, 0, ACS_LTEE);
-    mvwhline(current_win_, 2, 1, ACS_HLINE, 38);
-    mvwaddch(current_win_, 2, 39, ACS_RTEE);
+    mvwhline(current_win_, 2, 1, ACS_HLINE, current_window_width-2);
+    mvwaddch(current_win_, 2, current_window_width-1, ACS_RTEE);
     mvprintw(TERM_MAX_Y-1, 0, "ESC to exit, cursor keys to navigate");
     refresh();
 
@@ -143,6 +145,7 @@ public:
           const std::string prev = history_.back();
           history_.pop_back();
           update(prev);
+          break;
         }
         case KEY_RIGHT: {
           std::string next = item_name(current_item(menu_));
@@ -225,8 +228,12 @@ private:
     int max_y, max_x;
     getmaxyx(win, max_y, max_x);
 
-    mvwprintw(win, line, border, "%s", std::string(max_x-border*2,' ').c_str());
-    mvwprintw(win, line, (max_x - s.length()) / 2, "%s", s.c_str());
+    const int usable_x = max_x-border*2 -1;
+    const int x = std::max(2, (int)((max_x - s.length()) / 2));
+    const std::string s1 = s.length() > usable_x ? std::string(s, 0, usable_x) : s;
+
+    mvwprintw(win, line, border, "%s", std::string(usable_x+1,' ').c_str());
+    mvwprintw(win, line, x, "%s", s1.c_str());
     refresh();
   }
 
