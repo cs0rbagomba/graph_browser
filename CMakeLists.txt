@@ -9,4 +9,4 @@ set (CMAKE_CXX_COMPILER "/usr/bin/g++-5.1.0")
 
 add_executable (graph_browser main.cpp)
 include_directories(graph/lib/)
-#target_link_libraries(test_bin gcov)
+target_link_libraries(graph_browser ncurses menu)
