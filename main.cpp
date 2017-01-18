@@ -18,7 +18,7 @@ std::string generateRandomString(size_t length)
   const size_t max_index = (sizeof(charset) - 1);
 
   std::string str(length,0);
-  for (int i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length; ++i) {
     const size_t r = rand() % max_index;
     str[i] =  charset[r];
   }
@@ -31,7 +31,7 @@ std::vector<std::string> generateRandomStrings(size_t number_of_strings,
 {
   std::vector<std::string> v;
   v.resize(number_of_strings);
-  for (int i = 0; i < number_of_strings; ++i) {
+  for (size_t i = 0; i < number_of_strings; ++i) {
     const size_t l = min_length + rand()%(max_length - min_length);
     v[i] = generateRandomString(l);
   }
@@ -47,7 +47,7 @@ Graph<std::string> generateRandomGraph(size_t number_of_vertices,
   const std::vector<std::string> v = generateRandomStrings(number_of_vertices,
                                                            vertex_text_min_length,
                                                            vertex_text_max_length);
-  for (int i = 0; i < number_of_edges; ++i) {
+  for (size_t i = 0; i < number_of_edges; ++i) {
     const std::string source = v[rand()%number_of_vertices];
     const std::string destination = v[rand()%number_of_vertices];
     graph.addEdge(source, destination);
@@ -59,7 +59,7 @@ class NCursesInterface {
 public:
 
   static constexpr size_t TERM_MAX_X = 80;
-  static constexpr size_t TERM_MAX_Y = 10;
+  static constexpr size_t TERM_MAX_Y = 24;
   static constexpr int KEY_ESC = 27;
   static constexpr size_t window_height = TERM_MAX_Y-2;
   static constexpr size_t current_window_width = TERM_MAX_X/4;
@@ -94,7 +94,6 @@ public:
     , number_of_choices_(0)
     , graph_(g)
     , history_()
-    , history_string_()
   {
     // window of the current node
     menu_ = new_menu((ITEM **)items_);
@@ -158,8 +157,8 @@ public:
           if (history_.size() == 1)
             break;
 
-          const std::string prev = history_.back();
           history_.pop_back();
+          const std::string prev = history_.back();
           update(prev);
           break;
         }
@@ -195,13 +194,8 @@ private:
     const std::vector<std::string>& n = graph_.neighboursOf(s);
     addItems(n);
 
-    history_string_ = historyToString();
-    while (history_string_.length() > TERM_MAX_X) {
-      history_.pop_front();
-      history_string_ = historyToString();
-    }
     mvprintw(0, 0, "%s",std::string(TERM_MAX_X,' ').c_str());
-    mvprintw(0, 0, history_string_.c_str());
+    mvprintw(0, 0, historyToString().c_str());
     refresh();
   }
 
@@ -228,12 +222,11 @@ private:
     if (history_.empty())
       return std::string();
 
-    std::string s;
-    for (size_t i = 0; i < history_.size()-1; ++i) {
-      s += history_[i];
-      s += " | ";
-    }
-    s += history_[history_.size()-1];
+    std::string s(history_.back());
+    for (auto rit = history_.crbegin()+1; rit != history_.rend(); ++rit)
+      if (s.length() + (*rit).length() + 3 < TERM_MAX_X)
+        s.insert(0, std::string(*rit) + " | ");
+
     return s;
   }
 
@@ -244,9 +237,7 @@ private:
 
   const Graph<std::string>& graph_;
 
-  std::string current_;
   std::deque<std::string> history_;
-  std::string history_string_;
 };
 
 
