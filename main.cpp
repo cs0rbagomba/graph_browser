@@ -59,10 +59,11 @@ class NCursesInterface {
 public:
 
   static constexpr size_t TERM_MAX_X = 80;
-  static constexpr size_t TERM_MAX_Y = 24;
+  static constexpr size_t TERM_MAX_Y = 10;
   static constexpr int KEY_ESC = 27;
+  static constexpr size_t window_height = TERM_MAX_Y-2;
   static constexpr size_t current_window_width = TERM_MAX_X/4;
-  static constexpr size_t current_window_height = TERM_MAX_Y-2;
+  static constexpr size_t n_window_width = TERM_MAX_X/4;
 
   void static init()
   {
@@ -87,36 +88,49 @@ public:
   NCursesInterface(const Graph<std::string>& g)
     : menu_(0)
     , current_win_(0)
+    , n_win(0)
+    , n_n_win_(0)
     , items_(0)
     , number_of_choices_(0)
-
     , graph_(g)
-
-    , current_()
     , history_()
     , history_string_()
   {
+    // window of the current node
     menu_ = new_menu((ITEM **)items_);
 
-    current_win_ = newwin(current_window_height, current_window_width, 1, 0);
+    current_win_ = newwin(window_height, current_window_width, 1, 0);
     keypad(current_win_, TRUE);
 
     set_menu_win(menu_, current_win_);
-    set_menu_sub(menu_, derwin(current_win_, current_window_height-4, current_window_width-2, 3, 1));
-    set_menu_format(menu_, current_window_height-4, 1);
+    set_menu_sub(menu_, derwin(current_win_, window_height-2, current_window_width-2, 1, 1));
+    set_menu_format(menu_, window_height-2, 1);
 
     set_menu_mark(menu_, " ");
 
-    box(current_win_, 0, 0);
+    wborder(current_win_, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE,
+                          ACS_ULCORNER, ACS_TTEE, ACS_LLCORNER, ACS_BTEE);
+    post_menu(menu_);
+    refresh();
+    wrefresh(current_win_);
 
-    mvwaddch(current_win_, 2, 0, ACS_LTEE);
-    mvwhline(current_win_, 2, 1, ACS_HLINE, current_window_width-2);
-    mvwaddch(current_win_, 2, current_window_width-1, ACS_RTEE);
+    n_win = newwin(window_height, n_window_width, 1, current_window_width);
+    wborder(n_win, ' ', ' ', ACS_HLINE, ACS_HLINE,
+                   ACS_HLINE, ACS_HLINE, ACS_HLINE, ACS_HLINE);
+    refresh();
+    wrefresh(n_win);
+
+    // window of the neighbours'neighbours of the current vertex
+    n_n_win_ = newwin(window_height, TERM_MAX_X-current_window_width-n_window_width,
+                      1, n_window_width+current_window_width);
+    wborder(n_n_win_, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE,
+                      ACS_TTEE, ACS_URCORNER, ACS_BTEE, ACS_LRCORNER);
+    refresh();
+    wrefresh(n_n_win_);
+
+    // bottom text
     mvprintw(TERM_MAX_Y-1, 0, "ESC to exit, cursor keys to navigate");
     refresh();
-
-    post_menu(menu_);
-    wrefresh(current_win_);
   }
 
   ~NCursesInterface()
@@ -125,6 +139,8 @@ public:
     free_menu(menu_);
     for(int i = 0; i < number_of_choices_; ++i)
       free_item(items_[i]);
+
+    /// @todo delete windows and windows' subwindows
   }
 
   void mainLoop()
@@ -139,7 +155,7 @@ public:
           menu_driver(menu_, REQ_UP_ITEM);
           break;
         case KEY_LEFT: {
-          if (history_.empty())
+          if (history_.size() == 1)
             break;
 
           const std::string prev = history_.back();
@@ -149,7 +165,7 @@ public:
         }
         case KEY_RIGHT: {
           std::string next = item_name(current_item(menu_));
-          history_.push_back(current_);
+          history_.push_back(next);
           update(next);
           break;
         }
@@ -165,20 +181,18 @@ public:
     }
   }
 
+
+
   void setCurrentVertex(const std::string& s)
   {
-    current_ = s;
-    const std::vector<std::string>& n = graph_.neighboursOf(current_);
-    printInTheMiddle(current_win_, current_.c_str());
-    addItems(n);
+    history_.push_back(s);
+    update(s);
   }
 
 private:
 
   void update(const std::string& s) {
     const std::vector<std::string>& n = graph_.neighboursOf(s);
-    current_ = s;
-    printInTheMiddle(current_win_, s.c_str());
     addItems(n);
 
     history_string_ = historyToString();
@@ -204,7 +218,7 @@ private:
 
     items_[number_of_choices_] = new_item(0, 0);
     set_menu_items(menu_, items_);
-    set_menu_format(menu_, 6, 1);
+    set_menu_format(menu_, window_height-2, 1);
 
     post_menu(menu_);
     wrefresh(current_win_);
@@ -223,22 +237,8 @@ private:
     return s;
   }
 
-  void printInTheMiddle(WINDOW *win, const std::string& s, int line = 1, int border = 1)
-  {
-    int max_y, max_x;
-    getmaxyx(win, max_y, max_x);
-
-    const int usable_x = max_x-border*2 -1;
-    const int x = std::max(2, (int)((max_x - s.length()) / 2));
-    const std::string s1 = s.length() > usable_x ? std::string(s, 0, usable_x) : s;
-
-    mvwprintw(win, line, border, "%s", std::string(usable_x+1,' ').c_str());
-    mvwprintw(win, line, x, "%s", s1.c_str());
-    refresh();
-  }
-
   MENU *menu_;
-  WINDOW *current_win_;
+  WINDOW *current_win_, *n_win, * n_n_win_;
   ITEM **items_;
   int number_of_choices_;
 
