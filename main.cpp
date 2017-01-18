@@ -89,7 +89,7 @@ public:
     : menu_(0)
     , current_win_(0)
     , n_win(0)
-    , n_n_win_(0)
+    , n_of_n_win_(0)
     , items_(0)
     , graph_(g)
     , history_()
@@ -119,12 +119,12 @@ public:
     wrefresh(n_win);
 
     // window of the neighbours'neighbours of the current vertex
-    n_n_win_ = newwin(window_height, TERM_MAX_X-current_window_width-n_window_width,
+    n_of_n_win_ = newwin(window_height, TERM_MAX_X-current_window_width-n_window_width,
                       1, n_window_width+current_window_width);
-    wborder(n_n_win_, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE,
+    wborder(n_of_n_win_, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE,
                       ACS_TTEE, ACS_URCORNER, ACS_BTEE, ACS_LRCORNER);
     refresh();
-    wrefresh(n_n_win_);
+    wrefresh(n_of_n_win_);
 
     // bottom text
     mvprintw(TERM_MAX_Y-1, 0, "ESC to exit, cursor keys to navigate");
@@ -149,9 +149,11 @@ public:
       switch(c) {
         case KEY_DOWN:
           menu_driver(menu_, REQ_DOWN_ITEM);
+          update_neighbours();
           break;
         case KEY_UP:
           menu_driver(menu_, REQ_UP_ITEM);
+          update_neighbours();
           break;
         case KEY_LEFT: {
           if (history_.size() == 1)
@@ -159,13 +161,15 @@ public:
 
           history_.pop_back();
           const std::string prev = history_.back();
-          update(prev);
+          update_current(prev);
+          update_neighbours();
           break;
         }
         case KEY_RIGHT: {
           std::string next = item_name(current_item(menu_));
           history_.push_back(next);
-          update(next);
+          update_current(next);
+          update_neighbours();
           break;
         }
         case KEY_NPAGE:
@@ -185,18 +189,43 @@ public:
   void setCurrentVertex(const std::string& s)
   {
     history_.push_back(s);
-    update(s);
+    update_current(s);
   }
 
 private:
 
-  void update(const std::string& s) {
+  void update_current(const std::string& s)
+  {
     const std::vector<std::string>& n = graph_.neighboursOf(s);
     addItems(n);
 
     mvprintw(0, 0, "%s",std::string(TERM_MAX_X,' ').c_str());
     mvprintw(0, 0, historyToString().c_str());
     refresh();
+  }
+
+  void update_neighbours()
+  {
+
+    const size_t n_width = n_window_width-1;
+    const size_t n_of_n_width = TERM_MAX_X-current_window_width-n_window_width-3;
+    for (int i = 1; i < window_height-1; ++i) {
+      mvwprintw(n_win, i, 1, "%s", std::string(n_width,' ').c_str());
+      mvwprintw(n_of_n_win_, i, 1, "%s", std::string(n_of_n_width,' ').c_str());
+    }
+
+    const std::string current = item_name(current_item(menu_));
+    const std::vector<std::string>& n = graph_.neighboursOf(current);
+    for (size_t i = 0; i < n.size() && i < window_height-2; ++i) {
+      mvwprintw(n_win, i+1, 1, std::string(n[i], 0, std::min(n[i].length(), n_width)).c_str());
+
+      const std::vector<std::string>& n_of_n = graph_.neighboursOf(n[i]);
+      const std::string n_of_n_string = neighboursToString(n_of_n);
+      mvwprintw(n_of_n_win_, i+1, 2, std::string(n_of_n_string, 0, std::min(n_of_n_string.length(), n_of_n_width)).c_str());
+    }
+
+    wrefresh(n_win);
+    wrefresh(n_of_n_win_);
   }
 
   void addItems(const std::vector<std::string>& stringVector)
@@ -220,7 +249,8 @@ private:
     wrefresh(current_win_);
   }
 
-  std::string historyToString() const {
+  std::string historyToString() const
+  {
     if (history_.empty())
       return std::string();
 
@@ -232,8 +262,19 @@ private:
     return s;
   }
 
+  std::string neighboursToString(const std::vector<std::string>& n) const
+  {
+    std::string s;
+    for (size_t i = 0; i < n.size()-1; ++i) {
+      s += n[i];
+      s += ",";
+    }
+    s += n.back();
+    return s;
+  }
+
   MENU *menu_;
-  WINDOW *current_win_, *n_win, * n_n_win_;
+  WINDOW *current_win_, *n_win, * n_of_n_win_;
   ITEM **items_;
   const Graph<std::string>& graph_;
 
