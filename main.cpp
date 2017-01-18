@@ -91,7 +91,6 @@ public:
     , n_win(0)
     , n_n_win_(0)
     , items_(0)
-    , number_of_choices_(0)
     , graph_(g)
     , history_()
   {
@@ -136,7 +135,8 @@ public:
   {
     unpost_menu(menu_);
     free_menu(menu_);
-    for(int i = 0; i < number_of_choices_; ++i)
+    const int number_of_items = item_count(menu_);
+    for(int i = 0; i < number_of_items; ++i)
       free_item(items_[i]);
 
     /// @todo delete windows and windows' subwindows
@@ -202,15 +202,17 @@ private:
   void addItems(const std::vector<std::string>& stringVector)
   {
     unpost_menu(menu_);
-    for(int i = 0; i < number_of_choices_; ++i)
+    const int number_of_items = item_count(menu_);
+    for(int i = 0; i < number_of_items; ++i)
       free_item(items_[i]);
 
-    number_of_choices_ = stringVector.size();
-    items_ = (ITEM **)calloc(number_of_choices_+1, sizeof(ITEM *));
-    for(size_t i = 0; i < number_of_choices_; ++i)
+    const int number_of_new_items = stringVector.size();
+    items_ = (ITEM **)calloc(number_of_new_items+1, sizeof(ITEM *));
+    for(size_t i = 0; i < number_of_new_items; ++i)
       items_[i] = new_item(stringVector[i].c_str(), 0);
 
-    items_[number_of_choices_] = new_item(0, 0);
+    items_[number_of_new_items] = new_item(0, 0);
+
     set_menu_items(menu_, items_);
     set_menu_format(menu_, window_height-2, 1);
 
@@ -233,8 +235,6 @@ private:
   MENU *menu_;
   WINDOW *current_win_, *n_win, * n_n_win_;
   ITEM **items_;
-  int number_of_choices_;
-
   const Graph<std::string>& graph_;
 
   std::deque<std::string> history_;
