@@ -29,12 +29,9 @@ public:
 
 private:
 
-  void update_current(const std::string& s);
-  void update_neighbours();
+  void updateCurrent(const std::string& s);
+  void updateNeighbours();
   void addItems(const std::vector<std::string>& stringVector);
-
-  std::string historyToString() const;
-  std::string neighboursToString(const std::vector<std::string>& n) const;
 
   MENU *menu_;
   WINDOW *current_win_, *n_win, * n_of_n_win_;

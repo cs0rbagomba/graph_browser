@@ -1,11 +1,34 @@
-#include <curses.h>
-#include <menu.h>
-
-#include <deque>
-
 #include <cstring>
 
 #include "graph_browser.hpp"
+
+namespace {
+  std::string historyToString(const std::deque<std::string>& d, size_t max_length)
+  {
+    if (d.empty())
+      return std::string();
+
+    std::string s(d.back());
+    for (auto rit = d.crbegin()+1; rit != d.rend(); ++rit)
+      if (s.length() + (*rit).length() + 3 < max_length)
+        s.insert(0, std::string(*rit) + " | ");
+
+    return s;
+  }
+
+  std::string toCommaSeparatedList(const std::vector<std::string>& v)
+  {
+    std::string s;
+    for (size_t i = 0; i < v.size()-1; ++i) {
+      s += v[i];
+      s += ",";
+    }
+    s += v.back();
+    return s;
+  }
+
+}
+
 
 void GraphBrowser::init()
 {
@@ -91,11 +114,11 @@ void GraphBrowser::mainLoop()
     switch(c) {
       case KEY_DOWN:
         menu_driver(menu_, REQ_DOWN_ITEM);
-        update_neighbours();
+        updateNeighbours();
         break;
       case KEY_UP:
         menu_driver(menu_, REQ_UP_ITEM);
-        update_neighbours();
+        updateNeighbours();
         break;
       case KEY_LEFT: {
         if (history_.size() == 1)
@@ -103,15 +126,15 @@ void GraphBrowser::mainLoop()
 
         history_.pop_back();
         const std::string prev = history_.back();
-        update_current(prev);
-        update_neighbours();
+        updateCurrent(prev);
+        updateNeighbours();
         break;
       }
       case KEY_RIGHT: {
         std::string next = item_name(current_item(menu_));
         history_.push_back(next);
-        update_current(next);
-        update_neighbours();
+        updateCurrent(next);
+        updateNeighbours();
         break;
       }
       case KEY_NPAGE:
@@ -131,21 +154,21 @@ void GraphBrowser::mainLoop()
 void GraphBrowser::setCurrentVertex(const std::string& s)
 {
   history_.push_back(s);
-  update_current(s);
+  updateCurrent(s);
 }
 
 
-void GraphBrowser::update_current(const std::string& s)
+void GraphBrowser::updateCurrent(const std::string& s)
 {
   const std::vector<std::string>& n = graph_.neighboursOf(s);
   addItems(n);
 
   mvprintw(0, 0, "%s",std::string(TERM_MAX_X,' ').c_str());
-  mvprintw(0, 0, historyToString().c_str());
+  mvprintw(0, 0, historyToString(history_, TERM_MAX_X).c_str());
   refresh();
 }
 
-void GraphBrowser::update_neighbours()
+void GraphBrowser::updateNeighbours()
 {
 
   const size_t n_width = n_window_width-1;
@@ -161,7 +184,7 @@ void GraphBrowser::update_neighbours()
     mvwprintw(n_win, i+1, 1, std::string(n[i], 0, std::min(n[i].length(), n_width)).c_str());
 
     const std::vector<std::string>& n_of_n = graph_.neighboursOf(n[i]);
-    const std::string n_of_n_string = neighboursToString(n_of_n);
+    const std::string n_of_n_string = toCommaSeparatedList(n_of_n);
     mvwprintw(n_of_n_win_, i+1, 2, std::string(n_of_n_string, 0, std::min(n_of_n_string.length(), n_of_n_width)).c_str());
   }
 
@@ -188,28 +211,4 @@ void GraphBrowser::addItems(const std::vector<std::string>& stringVector)
 
   post_menu(menu_);
   wrefresh(current_win_);
-}
-
-std::string GraphBrowser::historyToString() const
-{
-  if (history_.empty())
-    return std::string();
-
-  std::string s(history_.back());
-  for (auto rit = history_.crbegin()+1; rit != history_.rend(); ++rit)
-    if (s.length() + (*rit).length() + 3 < TERM_MAX_X)
-      s.insert(0, std::string(*rit) + " | ");
-
-  return s;
-}
-
-std::string GraphBrowser::neighboursToString(const std::vector<std::string>& n) const
-{
-  std::string s;
-  for (size_t i = 0; i < n.size()-1; ++i) {
-    s += n[i];
-    s += ",";
-  }
-  s += n.back();
-  return s;
 }
