@@ -52,7 +52,7 @@ Graph<std::string> generateRandomGraph(size_t number_of_vertices,
 
 int main(int argc, char* argv[])
 {
-  const Graph<std::string> g = generateRandomGraph(10, 200, 5, 20);
+  Graph<std::string> g = generateRandomGraph(10, 200, 5, 20);
 
   GraphBrowser::init();
 

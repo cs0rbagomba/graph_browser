@@ -50,7 +50,7 @@ void GraphBrowser::destroy()
   endwin();
 }
 
-GraphBrowser::GraphBrowser(const Graph<std::string>& g)
+GraphBrowser::GraphBrowser(Graph<std::string>& g)
   : menu_(0)
   , current_win_(0)
   , n_win(0)
@@ -92,7 +92,7 @@ GraphBrowser::GraphBrowser(const Graph<std::string>& g)
   wrefresh(n_of_n_win_);
 
   // bottom text
-  mvprintw(TERM_MAX_Y-1, 0, "ESC to exit, cursor keys to navigate");
+  mvprintw(TERM_MAX_Y-1, 0, "ESC to exit, cursor keys to navigate, d to delete");
   refresh();
 }
 
@@ -144,7 +144,21 @@ void GraphBrowser::mainLoop()
         menu_driver(menu_, REQ_SCR_UPAGE);
         break;
 
+      case KEY_DEL: {
+        const std::string current = history_.back();
+        if (current == history_.front()) // cannot delete the first
+          break;
+
+        graph_.removeVertex(current);
+
+        history_.pop_back();
+        const std::string prev = history_.back();
+        updateCurrent(prev);
+        updateNeighbours();
+
       }
+    }
+
     wrefresh(current_win_);
   }
 }
