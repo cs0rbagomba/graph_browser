@@ -1,4 +1,5 @@
 #include <cstring>
+#include <algorithm>
 
 #include "graph_browser.hpp"
 
@@ -27,6 +28,10 @@ namespace {
     return s;
   }
 
+  void inline  removeFromHistory(std::deque<std::string>& h, const std::string& s)
+  {
+    std::remove(h.begin(), h.end(), s);
+  }
 }
 
 
@@ -92,7 +97,7 @@ GraphBrowser::GraphBrowser(Graph<std::string>& g)
   wrefresh(n_of_n_win_);
 
   // bottom text
-  mvprintw(TERM_MAX_Y-1, 0, "ESC to exit, cursor keys to navigate, d to delete");
+  mvprintw(TERM_MAX_Y-1, 0, "ESC:exit, cursors:navigate, d/i:del/ins edge, D/I:del/ins node");
   refresh();
 }
 
@@ -112,6 +117,7 @@ void GraphBrowser::mainLoop()
   int c;
   while((c = wgetch(current_win_)) != KEY_ESC) {
     switch(c) {
+
       case KEY_DOWN:
         menu_driver(menu_, REQ_DOWN_ITEM);
         updateNeighbours();
@@ -137,25 +143,55 @@ void GraphBrowser::mainLoop()
         updateNeighbours();
         break;
       }
-      case KEY_NPAGE:
+      case KEY_NPAGE: {
         menu_driver(menu_, REQ_SCR_DPAGE);
         break;
-      case KEY_PPAGE:
+      }
+      case KEY_PPAGE: {
         menu_driver(menu_, REQ_SCR_UPAGE);
         break;
+      }
 
-      case KEY_DEL: {
+      case KEY_UPPER_CASE_D: { // delete node
         const std::string current = history_.back();
-        if (current == history_.front()) // cannot delete the first
+        const ITEM* selected_item = current_item(menu_);
+        const std::string selected = item_name(selected_item);
+
+        if (selected == history_.front())
           break;
 
-        graph_.removeVertex(current);
+        graph_.removeVertex(selected);
+        removeFromHistory(history_, selected);
+        updateCurrent(current);
+        ///@todo keep selection
 
-        history_.pop_back();
-        const std::string prev = history_.back();
-        updateCurrent(prev);
+
+
+        break;
+      }
+      case KEY_UPPER_CASE_I: { // insert node
+        break;
+      }
+      case KEY_LOWER_CASE_D: { // delete edge
+        const std::string current = history_.back();
+        const ITEM* selected_item = current_item(menu_);
+        const std::string selected = item_name(selected_item);
+        graph_.removeEdge(current, selected);
+
+        const int selected_index = item_index(selected_item);
+        updateCurrent(current);
+
+        /// @bug keeping selection index does not work
+        const int number_of_items = item_count(menu_);
+        ITEM** items = menu_items(menu_);
+        ITEM* newly_selected_item = (ITEM*)items + std::min(selected_index, number_of_items-2) * sizeof(ITEM *);
+        const int r = set_current_item(menu_, newly_selected_item);
+
         updateNeighbours();
-
+        break;
+      }
+      case KEY_LOWER_CASE_I: { // insert edge
+        break;
       }
     }
 
@@ -165,10 +201,11 @@ void GraphBrowser::mainLoop()
 
 
 
-void GraphBrowser::setCurrentVertex(const std::string& s)
+void GraphBrowser::setStartVertex(const std::string& s)
 {
   history_.push_back(s);
   updateCurrent(s);
+  updateNeighbours();
 }
 
 
@@ -176,6 +213,7 @@ void GraphBrowser::updateCurrent(const std::string& s)
 {
   const std::vector<std::string>& n = graph_.neighboursOf(s);
   addItems(n);
+  updateNeighbours();
 
   mvprintw(0, 0, "%s",std::string(TERM_MAX_X,' ').c_str());
   mvprintw(0, 0, historyToString(history_, TERM_MAX_X).c_str());
@@ -186,7 +224,7 @@ void GraphBrowser::updateNeighbours()
 {
 
   const size_t n_width = n_window_width-1;
-  const size_t n_of_n_width = TERM_MAX_X-current_window_width-n_window_width-3;
+  const size_t n_of_n_width = TERM_MAX_X-current_window_width-n_window_width-2;
   for (int i = 1; i < window_height-1; ++i) {
     mvwprintw(n_win, i, 1, "%s", std::string(n_width,' ').c_str());
     mvwprintw(n_of_n_win_, i, 1, "%s", std::string(n_of_n_width,' ').c_str());
@@ -199,7 +237,7 @@ void GraphBrowser::updateNeighbours()
 
     const std::vector<std::string>& n_of_n = graph_.neighboursOf(n[i]);
     const std::string n_of_n_string = toCommaSeparatedList(n_of_n);
-    mvwprintw(n_of_n_win_, i+1, 2, std::string(n_of_n_string, 0, std::min(n_of_n_string.length(), n_of_n_width)).c_str());
+    mvwprintw(n_of_n_win_, i+1, 2, std::string(n_of_n_string, 0, std::min(n_of_n_string.length(), n_of_n_width-1)).c_str());
   }
 
   wrefresh(n_win);
@@ -218,7 +256,7 @@ void GraphBrowser::addItems(const std::vector<std::string>& stringVector)
   for(size_t i = 0; i < number_of_new_items; ++i)
     items_[i] = new_item(stringVector[i].c_str(), 0);
 
-  items_[number_of_new_items] = new_item(0, 0);
+  items_[number_of_new_items] = new_item(0, 0); // terminating empty item
 
   set_menu_items(menu_, items_);
   set_menu_format(menu_, window_height-2, 1);

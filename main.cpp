@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
   GraphBrowser::init();
 
   GraphBrowser ni(g);
-  ni.setCurrentVertex(*g.begin());
+  ni.setStartVertex(*g.begin());
   ni.mainLoop();
 
   GraphBrowser::destroy();

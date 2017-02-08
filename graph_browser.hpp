@@ -15,7 +15,10 @@ public:
   static constexpr size_t TERM_MAX_Y = 24;
 
   static constexpr int KEY_ESC = 27;
-  static constexpr int KEY_DEL = 100;  // d
+  static constexpr int KEY_LOWER_CASE_D = 100;
+  static constexpr int KEY_LOWER_CASE_I = 105;
+  static constexpr int KEY_UPPER_CASE_D = 68;
+  static constexpr int KEY_UPPER_CASE_I = 73;
 
   static constexpr size_t window_height = TERM_MAX_Y-2;
   static constexpr size_t current_window_width = TERM_MAX_X/4;
@@ -28,7 +31,7 @@ public:
   ~GraphBrowser();
 
   void mainLoop();
-  void setCurrentVertex(const std::string& s);
+  void setStartVertex(const std::string& s);
 
 private:
 
