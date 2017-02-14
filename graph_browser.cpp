@@ -1,5 +1,6 @@
 #include <cstring>
 #include <algorithm>
+#include <cassert>
 
 #include "graph_browser.hpp"
 
@@ -32,6 +33,20 @@ namespace {
   {
     std::remove(h.begin(), h.end(), s);
   }
+
+  ITEM* getNthItem(const MENU* menu, int n)
+  {
+    const int number_of_items = item_count(menu);
+    if (number_of_items == 0 || n > number_of_items)
+      return 0;
+
+    ITEM** items = menu_items(menu);
+    ITEM* retval = *items;
+    for (int i = 1; i <= n; ++i)
+      retval = retval->down;
+
+    return retval;
+  }
 }
 
 
@@ -60,12 +75,11 @@ GraphBrowser::GraphBrowser(Graph<std::string>& g)
   , current_win_(0)
   , n_win(0)
   , n_of_n_win_(0)
-  , items_(0)
   , graph_(g)
   , history_()
 {
   // window of the current node
-  menu_ = new_menu((ITEM **)items_);
+  menu_ = new_menu((ITEM **)0);
 
   current_win_ = newwin(window_height, current_window_width, 1, 0);
   keypad(current_win_, TRUE);
@@ -106,8 +120,9 @@ GraphBrowser::~GraphBrowser()
   unpost_menu(menu_);
   free_menu(menu_);
   const int number_of_items = item_count(menu_);
+  ITEM** old_items = menu_items(menu_);
   for(int i = 0; i < number_of_items; ++i)
-    free_item(items_[i]);
+    free_item(old_items[i]);
 
   /// @todo delete windows and windows' subwindows
 }
@@ -137,7 +152,11 @@ void GraphBrowser::mainLoop()
         break;
       }
       case KEY_RIGHT: {
-        std::string next = item_name(current_item(menu_));
+        ITEM* c_item = current_item(menu_);
+        if (c_item == 0)
+          break;
+
+        std::string next = item_name(c_item);
         history_.push_back(next);
         updateCurrent(next);
         updateNeighbours();
@@ -154,19 +173,30 @@ void GraphBrowser::mainLoop()
 
       case KEY_UPPER_CASE_D: { // delete node
         const std::string current = history_.back();
-        const ITEM* selected_item = current_item(menu_);
-        const std::string selected = item_name(selected_item);
+        const ITEM* c_item = current_item(menu_);
+        if (c_item == 0)
+          break;
 
-        if (selected == history_.front())
+        const std::string selected = item_name(c_item);
+
+        if (selected == history_.front()) // cannot delete start node
           break;
 
         graph_.removeVertex(selected);
         removeFromHistory(history_, selected);
+
+        const int selected_index = item_index(c_item);
         updateCurrent(current);
-        ///@todo keep selection
 
+        const int number_of_items = item_count(menu_);
+        if (number_of_items == 0)
+          break;
 
+        ITEM* newly_selected_item = getNthItem(menu_, std::min(selected_index, number_of_items-1));
+        const int r = set_current_item(menu_, newly_selected_item);
+        assert (r == E_OK);
 
+        updateNeighbours();
         break;
       }
       case KEY_UPPER_CASE_I: { // insert node
@@ -174,18 +204,23 @@ void GraphBrowser::mainLoop()
       }
       case KEY_LOWER_CASE_D: { // delete edge
         const std::string current = history_.back();
-        const ITEM* selected_item = current_item(menu_);
-        const std::string selected = item_name(selected_item);
+        const ITEM* c_item = current_item(menu_);
+        if (c_item == 0)
+          break;
+
+        const std::string selected = item_name(c_item);
         graph_.removeEdge(current, selected);
 
-        const int selected_index = item_index(selected_item);
+        const int selected_index = item_index(c_item);
         updateCurrent(current);
 
-        /// @bug keeping selection index does not work
         const int number_of_items = item_count(menu_);
-        ITEM** items = menu_items(menu_);
-        ITEM* newly_selected_item = (ITEM*)items + std::min(selected_index, number_of_items-2) * sizeof(ITEM *);
+        if (number_of_items == 0)
+          break;
+
+        ITEM* newly_selected_item = getNthItem(menu_, std::min(selected_index, number_of_items-1));
         const int r = set_current_item(menu_, newly_selected_item);
+        assert (r == E_OK);
 
         updateNeighbours();
         break;
@@ -230,37 +265,54 @@ void GraphBrowser::updateNeighbours()
     mvwprintw(n_of_n_win_, i, 1, "%s", std::string(n_of_n_width,' ').c_str());
   }
 
-  const std::string current = item_name(current_item(menu_));
-  const std::vector<std::string>& n = graph_.neighboursOf(current);
-  for (size_t i = 0; i < n.size() && i < window_height-2; ++i) {
-    mvwprintw(n_win, i+1, 1, std::string(n[i], 0, std::min(n[i].length(), n_width)).c_str());
+  ITEM* c_item = current_item(menu_);
+  if (c_item != 0) {
+    const std::string current = item_name(c_item);
+    const std::vector<std::string>& n = graph_.neighboursOf(current);
+    for (size_t i = 0; i < n.size() && i < window_height-2; ++i) {
+      const size_t n_win_w = std::min(n[i].length(), n_width);
+      mvwprintw(n_win, i+1, 1, std::string(n[i], 0, n_win_w).c_str());
 
-    const std::vector<std::string>& n_of_n = graph_.neighboursOf(n[i]);
-    const std::string n_of_n_string = toCommaSeparatedList(n_of_n);
-    mvwprintw(n_of_n_win_, i+1, 2, std::string(n_of_n_string, 0, std::min(n_of_n_string.length(), n_of_n_width-1)).c_str());
+      const std::vector<std::string>& n_of_n = graph_.neighboursOf(n[i]);
+      const std::string n_of_n_string = toCommaSeparatedList(n_of_n);
+      const size_t n_of_n_win__w = std::min(n_of_n_string.length(), n_of_n_width-1);
+      mvwprintw(n_of_n_win_, i+1, 2,
+                std::string(n_of_n_string, 0, n_of_n_win__w).c_str());
+    }
   }
 
-  wrefresh(n_win);
-  wrefresh(n_of_n_win_);
+  assert(wrefresh(n_win) == E_OK);
+  assert(wrefresh(n_of_n_win_) == E_OK);
 }
 
 void GraphBrowser::addItems(const std::vector<std::string>& stringVector)
 {
-  unpost_menu(menu_);
-  const int number_of_items = item_count(menu_);
-  for(int i = 0; i < number_of_items; ++i)
-    free_item(items_[i]);
+  // keep pointed to deallocate old items
+  ITEM** old_items = menu_items(menu_);
+  const int old_items_count = item_count(menu_);
+
+  const int u = unpost_menu(menu_);
+  assert (u == E_OK || u == E_NOT_POSTED);
 
   const int number_of_new_items = stringVector.size();
-  items_ = (ITEM **)calloc(number_of_new_items+1, sizeof(ITEM *));
-  for(size_t i = 0; i < number_of_new_items; ++i)
-    items_[i] = new_item(stringVector[i].c_str(), 0);
+  ITEM** new_items = 0;
+  if (number_of_new_items > 0) {
+    new_items = (ITEM **)calloc(number_of_new_items+1, sizeof(ITEM *));
+    for(size_t i = 0; i < number_of_new_items; ++i) {
+      new_items[i] = new_item(stringVector[i].c_str(), 0);
+      assert (new_items[i]);
+    }
+    new_items[number_of_new_items] = 0; // terminating empty item
+  }
+  assert(set_menu_items(menu_, new_items) == E_OK);
 
-  items_[number_of_new_items] = new_item(0, 0); // terminating empty item
+  if (number_of_new_items > 0) {
+    assert(set_menu_format(menu_, window_height-2, 1) == E_OK);
+    assert(post_menu(menu_) == E_OK);
+  }
+  assert(wrefresh(current_win_) == OK);
 
-  set_menu_items(menu_, items_);
-  set_menu_format(menu_, window_height-2, 1);
-
-  post_menu(menu_);
-  wrefresh(current_win_);
+  // deallocate old items
+  for (int i = 0; i < old_items_count; ++i)
+    assert(free_item(old_items[i]) == E_OK);
 }

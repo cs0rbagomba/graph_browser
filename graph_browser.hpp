@@ -41,7 +41,7 @@ private:
 
   MENU *menu_;
   WINDOW *current_win_, *n_win, * n_of_n_win_;
-  ITEM **items_;
+//   ITEM **items_;
   Graph<std::string>& graph_;
 
   std::deque<std::string> history_;
