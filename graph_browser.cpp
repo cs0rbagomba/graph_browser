@@ -172,57 +172,14 @@ void GraphBrowser::mainLoop()
       }
 
       case KEY_UPPER_CASE_D: { // delete node
-        const std::string current = history_.back();
-        const ITEM* c_item = current_item(menu_);
-        if (c_item == 0)
-          break;
-
-        const std::string selected = item_name(c_item);
-
-        if (selected == history_.front()) // cannot delete start node
-          break;
-
-        graph_.removeVertex(selected);
-        removeFromHistory(history_, selected);
-
-        const int selected_index = item_index(c_item);
-        updateCurrent(current);
-
-        const int number_of_items = item_count(menu_);
-        if (number_of_items == 0)
-          break;
-
-        ITEM* newly_selected_item = getNthItem(menu_, std::min(selected_index, number_of_items-1));
-        const int r = set_current_item(menu_, newly_selected_item);
-        assert (r == E_OK);
-
-        updateNeighbours();
+        deleteElement(true);
         break;
       }
       case KEY_UPPER_CASE_I: { // insert node
         break;
       }
       case KEY_LOWER_CASE_D: { // delete edge
-        const std::string current = history_.back();
-        const ITEM* c_item = current_item(menu_);
-        if (c_item == 0)
-          break;
-
-        const std::string selected = item_name(c_item);
-        graph_.removeEdge(current, selected);
-
-        const int selected_index = item_index(c_item);
-        updateCurrent(current);
-
-        const int number_of_items = item_count(menu_);
-        if (number_of_items == 0)
-          break;
-
-        ITEM* newly_selected_item = getNthItem(menu_, std::min(selected_index, number_of_items-1));
-        const int r = set_current_item(menu_, newly_selected_item);
-        assert (r == E_OK);
-
-        updateNeighbours();
+        deleteElement(false);
         break;
       }
       case KEY_LOWER_CASE_I: { // insert edge
@@ -234,7 +191,38 @@ void GraphBrowser::mainLoop()
   }
 }
 
+void GraphBrowser::deleteElement(bool delete_node)
+{
+  const std::string current = history_.back();
+  const ITEM* c_item = current_item(menu_);
+  if (c_item == 0)
+    return;
 
+  const std::string selected = item_name(c_item);
+
+  if (delete_node) {
+    if (selected == history_.front()) // cannot delete start node
+      return;
+
+    graph_.removeVertex(selected);
+    removeFromHistory(history_, selected);
+  } else {
+    graph_.removeEdge(current, selected);
+  }
+
+  const int selected_index = item_index(c_item);
+  updateCurrent(current);
+
+  const int number_of_items = item_count(menu_);
+  if (number_of_items == 0)
+    return;
+
+  ITEM* newly_selected_item = getNthItem(menu_, std::min(selected_index, number_of_items-1));
+  const int r = set_current_item(menu_, newly_selected_item);
+  assert (r == E_OK);
+
+  updateNeighbours();
+}
 
 void GraphBrowser::setStartVertex(const std::string& s)
 {

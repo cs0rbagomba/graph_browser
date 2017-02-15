@@ -38,6 +38,7 @@ private:
   void updateCurrent(const std::string& s);
   void updateNeighbours();
   void addItems(const std::vector<std::string>& stringVector);
+  void deleteElement(bool delete_node);
 
   MENU *menu_;
   WINDOW *current_win_, *n_win, * n_of_n_win_;
