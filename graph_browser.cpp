@@ -1,6 +1,7 @@
 #include <cstring>
-#include <algorithm>
 #include <cassert>
+
+#include <algorithm>
 
 #include "graph_browser.hpp"
 
@@ -47,6 +48,7 @@ namespace {
 
     return retval;
   }
+
 }
 
 
@@ -78,6 +80,12 @@ GraphBrowser::GraphBrowser(Graph<std::string>& g)
   , graph_(g)
   , history_()
 {
+  updateDimensions();
+  initLayout();
+}
+
+void GraphBrowser::initLayout()
+{
   // window of the current node
   menu_ = new_menu((ITEM **)0);
 
@@ -103,7 +111,7 @@ GraphBrowser::GraphBrowser(Graph<std::string>& g)
   wrefresh(n_win);
 
   // window of the neighbours'neighbours of the current vertex
-  n_of_n_win_ = newwin(window_height, TERM_MAX_X-current_window_width-n_window_width,
+  n_of_n_win_ = newwin(window_height, term_max_x_-current_window_width-n_window_width,
                     1, n_window_width+current_window_width);
   wborder(n_of_n_win_, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE,
                     ACS_TTEE, ACS_URCORNER, ACS_BTEE, ACS_LRCORNER);
@@ -111,9 +119,10 @@ GraphBrowser::GraphBrowser(Graph<std::string>& g)
   wrefresh(n_of_n_win_);
 
   // bottom text
-  mvprintw(TERM_MAX_Y-1, 0, "ESC:exit, cursors:navigate, d/i:del/ins edge, D/I:del/ins node");
+  mvprintw(term_max_y_-1, 0, "ESC:exit, cursors:navigate, d/i:del/ins edge, D/I:del/ins node");
   refresh();
 }
+
 
 GraphBrowser::~GraphBrowser()
 {
@@ -238,8 +247,8 @@ void GraphBrowser::updateCurrent(const std::string& s)
   addItems(n);
   updateNeighbours();
 
-  mvprintw(0, 0, "%s",std::string(TERM_MAX_X,' ').c_str());
-  mvprintw(0, 0, historyToString(history_, TERM_MAX_X).c_str());
+  mvprintw(0, 0, "%s",std::string(term_max_x_,' ').c_str());
+  mvprintw(0, 0, historyToString(history_, term_max_x_).c_str());
   refresh();
 }
 
@@ -247,7 +256,7 @@ void GraphBrowser::updateNeighbours()
 {
 
   const size_t n_width = n_window_width-1;
-  const size_t n_of_n_width = TERM_MAX_X-current_window_width-n_window_width-2;
+  const size_t n_of_n_width = term_max_x_-current_window_width-n_window_width-2;
   for (int i = 1; i < window_height-1; ++i) {
     mvwprintw(n_win, i, 1, "%s", std::string(n_width,' ').c_str());
     mvwprintw(n_of_n_win_, i, 1, "%s", std::string(n_of_n_width,' ').c_str());
@@ -303,4 +312,29 @@ void GraphBrowser::addItems(const std::vector<std::string>& stringVector)
   // deallocate old items
   for (int i = 0; i < old_items_count; ++i)
     assert(free_item(old_items[i]) == E_OK);
+}
+
+void GraphBrowser::updateDimensions()
+{
+  term_max_x_ = COLS;
+  term_max_y_ = LINES;
+  window_height = term_max_y_-2;
+  current_window_width = term_max_x_/4;
+  n_window_width = term_max_x_/4;
+}
+
+void GraphBrowser::terminalResizedEvent(int)
+{
+  endwin();
+  refresh();
+  clear();
+
+  free_menu(menu_);
+  delwin(current_win_);
+  delwin(n_win);
+  delwin(n_of_n_win_);
+
+  updateDimensions();
+  initLayout();
+  updateCurrent(history_.back());
 }

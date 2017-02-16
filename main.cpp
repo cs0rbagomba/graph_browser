@@ -1,8 +1,13 @@
 #include <graph/graph.hpp>
 
 #include <string>
+#include <signal.h>
+
+#include <functional>
 
 #include "graph_browser.hpp"
+
+using namespace std::placeholders;
 
 std::string generateRandomString(size_t length)
 {
@@ -50,15 +55,29 @@ Graph<std::string> generateRandomGraph(size_t number_of_vertices,
   return graph;
 }
 
+std::function<void(int)> callback_function;
+
+void CallCb( int value )
+{
+  callback_function(value);
+}
+
 int main(int argc, char* argv[])
 {
   Graph<std::string> g = generateRandomGraph(10, 200, 5, 20);
 
   GraphBrowser::init();
 
-  GraphBrowser ni(g);
-  ni.setStartVertex(*g.begin());
-  ni.mainLoop();
+  GraphBrowser gb(g);
+  gb.setStartVertex(*g.begin());
+
+  callback_function = std::bind1st(std::mem_fun(&GraphBrowser::terminalResizedEvent), &gb);
+
+  struct sigaction act;
+  act.sa_handler = CallCb;
+  sigaction(SIGWINCH, &act, NULL);
+
+  gb.mainLoop();
 
   GraphBrowser::destroy();
   return EXIT_SUCCESS;
