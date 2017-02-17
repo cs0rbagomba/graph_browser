@@ -37,15 +37,15 @@ public:
 private:
 
   void initLayout();
-  void updateCurrent(const std::string& s);
+  void cleanUp();
+  void updateCurrent(const std::string& s, bool first_run = false);
   void updateNeighbours();
-  void addItems(const std::vector<std::string>& stringVector);
+  void addItems(const std::vector<std::string>& stringVector, bool first_run);
   void deleteElement(bool delete_node);
   void updateDimensions();
 
   MENU *menu_;
-  WINDOW *current_win_, *n_win, * n_of_n_win_;
-//   ITEM **items_;
+  WINDOW *current_win_, *menu_subwindow_, *n_win_, * n_of_n_win_;
   Graph<std::string>& graph_;
 
   std::deque<std::string> history_;

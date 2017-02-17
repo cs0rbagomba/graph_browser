@@ -54,15 +54,14 @@ namespace {
 
 void GraphBrowser::init()
 {
-  initscr();
-  cbreak();
-  noecho();
-  keypad(stdscr, TRUE);
+  assert(initscr());
+  assert(cbreak() == OK);
+  assert(noecho() == OK);
+  assert(keypad(stdscr, TRUE) == OK);
 
   //Needed to have ‘immediate’ ESC-Key behavior:
-  if (getenv ("ESCDELAY") == NULL) {
-    set_escdelay(25);
-  }
+  if (getenv ("ESCDELAY") == NULL)
+    assert(set_escdelay(25) == OK);
 }
 
 void GraphBrowser::destroy()
@@ -75,7 +74,8 @@ void GraphBrowser::destroy()
 GraphBrowser::GraphBrowser(Graph<std::string>& g)
   : menu_(0)
   , current_win_(0)
-  , n_win(0)
+  , menu_subwindow_(0)
+  , n_win_(0)
   , n_of_n_win_(0)
   , graph_(g)
   , history_()
@@ -88,52 +88,71 @@ void GraphBrowser::initLayout()
 {
   // window of the current node
   menu_ = new_menu((ITEM **)0);
+  assert(menu_);
 
   current_win_ = newwin(window_height, current_window_width, 1, 0);
-  keypad(current_win_, TRUE);
+  assert(current_win_);
+  assert(keypad(current_win_, TRUE) == OK);
 
-  set_menu_win(menu_, current_win_);
-  set_menu_sub(menu_, derwin(current_win_, window_height-2, current_window_width-2, 1, 1));
-  set_menu_format(menu_, window_height-2, 1);
+  assert(set_menu_win(menu_, current_win_) == E_OK);
+  menu_subwindow_ = derwin(current_win_, window_height-2, current_window_width-2, 1, 1);
+  assert(menu_subwindow_);
+  assert(set_menu_sub(menu_, menu_subwindow_) == E_OK);
+  const int r = set_menu_format(menu_, window_height-2, 1);
+  assert(set_menu_mark(menu_, " ") == E_OK);
 
-  set_menu_mark(menu_, " ");
+  assert(wborder(current_win_,
+                 ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE,
+                 ACS_ULCORNER, ACS_TTEE, ACS_LLCORNER, ACS_BTEE) == OK);
+  assert(refresh() == OK);
+  assert(wrefresh(current_win_) == OK);
 
-  wborder(current_win_, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE,
-                        ACS_ULCORNER, ACS_TTEE, ACS_LLCORNER, ACS_BTEE);
-  post_menu(menu_);
-  refresh();
-  wrefresh(current_win_);
-
-  n_win = newwin(window_height, n_window_width, 1, current_window_width);
-  wborder(n_win, ' ', ' ', ACS_HLINE, ACS_HLINE,
-                 ACS_HLINE, ACS_HLINE, ACS_HLINE, ACS_HLINE);
-  refresh();
-  wrefresh(n_win);
+  n_win_ = newwin(window_height, n_window_width, 1, current_window_width);
+  assert(n_win_);
+  assert(wborder(n_win_,
+                 ' ', ' ', ACS_HLINE, ACS_HLINE,
+                 ACS_HLINE, ACS_HLINE, ACS_HLINE, ACS_HLINE) == OK);
+  assert(refresh() == OK);
+  assert(wrefresh(n_win_) == OK);
 
   // window of the neighbours'neighbours of the current vertex
   n_of_n_win_ = newwin(window_height, term_max_x_-current_window_width-n_window_width,
                     1, n_window_width+current_window_width);
-  wborder(n_of_n_win_, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE,
-                    ACS_TTEE, ACS_URCORNER, ACS_BTEE, ACS_LRCORNER);
-  refresh();
-  wrefresh(n_of_n_win_);
+  assert(n_of_n_win_);
+  assert(wborder(n_of_n_win_,
+                 ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE,
+                 ACS_TTEE, ACS_URCORNER, ACS_BTEE, ACS_LRCORNER) == OK);
+  assert(refresh() == OK);
+  assert(wrefresh(n_of_n_win_) == OK);
 
   // bottom text
+  /// @note should we assert as a minimum width?
   mvprintw(term_max_y_-1, 0, "ESC:exit, cursors:navigate, d/i:del/ins edge, D/I:del/ins node");
-  refresh();
+  assert(refresh() == OK);
 }
 
+void GraphBrowser::cleanUp()
+{
+  assert(endwin() == OK);
+  assert(refresh() == OK);
+  assert(clear() == OK);
+
+  ITEM** old_items = menu_items(menu_);
+  const int old_items_count = item_count(menu_);
+  assert(unpost_menu(menu_) == E_OK);
+  assert(free_menu(menu_) == E_OK);
+  for (int i = 0; i < old_items_count; ++i)
+    assert(free_item(old_items[i]) == E_OK);
+
+  assert(delwin(menu_subwindow_) == OK);
+  assert(delwin(current_win_) == OK);
+  assert(delwin(n_win_) == OK);
+  assert(delwin(n_of_n_win_) == OK);
+}
 
 GraphBrowser::~GraphBrowser()
 {
-  unpost_menu(menu_);
-  free_menu(menu_);
-  const int number_of_items = item_count(menu_);
-  ITEM** old_items = menu_items(menu_);
-  for(int i = 0; i < number_of_items; ++i)
-    free_item(old_items[i]);
-
-  /// @todo delete windows and windows' subwindows
+  cleanUp();
 }
 
 void GraphBrowser::mainLoop()
@@ -236,19 +255,19 @@ void GraphBrowser::deleteElement(bool delete_node)
 void GraphBrowser::setStartVertex(const std::string& s)
 {
   history_.push_back(s);
-  updateCurrent(s);
+  updateCurrent(s, true);
   updateNeighbours();
 }
 
 
-void GraphBrowser::updateCurrent(const std::string& s)
+void GraphBrowser::updateCurrent(const std::string& s, bool first_run)
 {
   const std::vector<std::string>& n = graph_.neighboursOf(s);
-  addItems(n);
+  addItems(n, first_run);
   updateNeighbours();
 
-  mvprintw(0, 0, "%s",std::string(term_max_x_,' ').c_str());
-  mvprintw(0, 0, historyToString(history_, term_max_x_).c_str());
+  assert(mvprintw(0, 0, "%s",std::string(term_max_x_,' ').c_str()) == OK);
+  assert(mvprintw(0, 0, historyToString(history_, term_max_x_).c_str()) == OK);
   refresh();
 }
 
@@ -258,8 +277,8 @@ void GraphBrowser::updateNeighbours()
   const size_t n_width = n_window_width-1;
   const size_t n_of_n_width = term_max_x_-current_window_width-n_window_width-2;
   for (int i = 1; i < window_height-1; ++i) {
-    mvwprintw(n_win, i, 1, "%s", std::string(n_width,' ').c_str());
-    mvwprintw(n_of_n_win_, i, 1, "%s", std::string(n_of_n_width,' ').c_str());
+    assert(mvwprintw(n_win_, i, 1, "%s", std::string(n_width,' ').c_str()) == OK);
+    assert(mvwprintw(n_of_n_win_, i, 1, "%s", std::string(n_of_n_width,' ').c_str()) == OK);
   }
 
   ITEM* c_item = current_item(menu_);
@@ -268,28 +287,28 @@ void GraphBrowser::updateNeighbours()
     const std::vector<std::string>& n = graph_.neighboursOf(current);
     for (size_t i = 0; i < n.size() && i < window_height-2; ++i) {
       const size_t n_win_w = std::min(n[i].length(), n_width);
-      mvwprintw(n_win, i+1, 1, std::string(n[i], 0, n_win_w).c_str());
+      assert(mvwprintw(n_win_, i+1, 1, std::string(n[i], 0, n_win_w).c_str()) == OK);
 
       const std::vector<std::string>& n_of_n = graph_.neighboursOf(n[i]);
       const std::string n_of_n_string = toCommaSeparatedList(n_of_n);
       const size_t n_of_n_win__w = std::min(n_of_n_string.length(), n_of_n_width-1);
-      mvwprintw(n_of_n_win_, i+1, 2,
-                std::string(n_of_n_string, 0, n_of_n_win__w).c_str());
+      assert(mvwprintw(n_of_n_win_, i+1, 2,
+                std::string(n_of_n_string, 0, n_of_n_win__w).c_str()) == OK);
     }
   }
 
-  assert(wrefresh(n_win) == E_OK);
+  assert(wrefresh(n_win_) == E_OK);
   assert(wrefresh(n_of_n_win_) == E_OK);
 }
 
-void GraphBrowser::addItems(const std::vector<std::string>& stringVector)
+void GraphBrowser::addItems(const std::vector<std::string>& stringVector, bool first_run)
 {
   // keep pointed to deallocate old items
   ITEM** old_items = menu_items(menu_);
   const int old_items_count = item_count(menu_);
 
   const int u = unpost_menu(menu_);
-  assert (u == E_OK || u == E_NOT_POSTED);
+  assert (u == E_OK || first_run && u == E_NOT_POSTED);
 
   const int number_of_new_items = stringVector.size();
   ITEM** new_items = 0;
@@ -325,16 +344,8 @@ void GraphBrowser::updateDimensions()
 
 void GraphBrowser::terminalResizedEvent(int)
 {
-  endwin();
-  refresh();
-  clear();
-
-  free_menu(menu_);
-  delwin(current_win_);
-  delwin(n_win);
-  delwin(n_of_n_win_);
-
+  cleanUp();
   updateDimensions();
   initLayout();
-  updateCurrent(history_.back());
+  updateCurrent(history_.back(), true);
 }

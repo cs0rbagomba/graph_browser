@@ -7,8 +7,6 @@
 
 #include "graph_browser.hpp"
 
-using namespace std::placeholders;
-
 std::string generateRandomString(size_t length)
 {
   const char charset[] =
@@ -55,11 +53,11 @@ Graph<std::string> generateRandomGraph(size_t number_of_vertices,
   return graph;
 }
 
-std::function<void(int)> callback_function;
+std::function<void(int)> callback_wrapper;
 
-void CallCb( int value )
+void callback_function( int value )
 {
-  callback_function(value);
+  callback_wrapper(value);
 }
 
 int main(int argc, char* argv[])
@@ -67,17 +65,19 @@ int main(int argc, char* argv[])
   Graph<std::string> g = generateRandomGraph(10, 200, 5, 20);
 
   GraphBrowser::init();
+  {
+    GraphBrowser gb(g);
+    gb.setStartVertex(*g.begin());
 
-  GraphBrowser gb(g);
-  gb.setStartVertex(*g.begin());
+    callback_wrapper = std::bind(&GraphBrowser::terminalResizedEvent,
+                                 &gb,
+                                 std::placeholders::_1);
+    struct sigaction act;
+    act.sa_handler = callback_function;
+    sigaction(SIGWINCH, &act, NULL);
 
-  callback_function = std::bind1st(std::mem_fun(&GraphBrowser::terminalResizedEvent), &gb);
-
-  struct sigaction act;
-  act.sa_handler = CallCb;
-  sigaction(SIGWINCH, &act, NULL);
-
-  gb.mainLoop();
+    gb.mainLoop();
+  }
 
   GraphBrowser::destroy();
   return EXIT_SUCCESS;
